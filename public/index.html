@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Card Tower Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="game">
+      <section class="top-bar">
+        <div>
+          <h1>Card Tower</h1>
+          <p>Drag cards into the tower. Stack them higher to score more!</p>
+        </div>
+
+        <div class="score-box">
+          <div>Cards: <span id="cardCount">0</span></div>
+          <div>Rows: <span id="rowCount">0</span></div>
+          <div>Score: <span id="score">0</span></div>
+        </div>
+      </section>
+
+      <section class="play-area">
+        <div class="deck-panel">
+          <h2>Deck</h2>
+          <div id="deck" class="deck">
+            <div id="dragCard" class="card" role="button" tabindex="0">
+              🂠
+            </div>
+          </div>
+          <button id="resetButton">New Tower</button>
+          <button id="saveButton">Save Score</button>
+        </div>
+
+        <div class="tower-panel">
+          <h2>Tower</h2>
+          <div id="towerZone" class="tower-zone">
+            <div id="tower" class="tower"></div>
+            <div class="drop-hint">Drop cards here</div>
+          </div>
+        </div>
+
+        <div class="highscores-panel">
+          <h2>High Scores</h2>
+          <ol id="highscores"></ol>
+        </div>
+      </section>
+    </main>
+
+    <script src="game.js"></script>
+  </body>
+</html>

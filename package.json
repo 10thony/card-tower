@@ -1,0 +1,12 @@
+{
+  "name": "card-tower-game",
+  "version": "1.0.0",
+  "description": "A touch-friendly card stacking tower game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.3"
+  }
+}
