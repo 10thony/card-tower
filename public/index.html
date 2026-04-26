@@ -9,41 +9,46 @@
   <body>
     <main class="game">
       <section class="top-bar">
-        <div>
+        <div class="title-wrap">
           <h1>Card Tower</h1>
-          <p>Drag cards into the tower. Stack them higher to score more!</p>
+          <p>Build a stable tower from a short deck. Each card is worth 5 points, and matching suits in lines creates combo cards with bonus points. A bad drop ends the run.</p>
         </div>
 
-        <div class="score-box">
-          <div>Cards: <span id="cardCount">0</span></div>
-          <div>Rows: <span id="rowCount">0</span></div>
-          <div>Score: <span id="score">0</span></div>
-        </div>
-      </section>
-
-      <section class="play-area">
-        <div class="deck-panel">
+        <div class="deck-panel deck-panel-compact">
           <h2>Deck</h2>
           <div id="deck" class="deck">
             <div id="dragCard" class="card" role="button" tabindex="0">
               🂠
             </div>
           </div>
-          <button id="resetButton">New Tower</button>
-          <button id="saveButton">Save Score</button>
+          <p id="nextCardInfo" class="next-card-info"></p>
+          <p id="deckCountInfo" class="deck-count-info"></p>
+          <div class="deck-actions">
+            <button id="resetButton">New Tower</button>
+            <button id="saveButton">Save Score</button>
+          </div>
         </div>
 
+        <div class="score-box">
+          <div>Cards: <span id="cardCount">0</span></div>
+          <div>Rows: <span id="rowCount">0</span></div>
+          <div>Score: <span id="score">0</span></div>
+          <div>Rule: <span id="ruleText">Suit Match</span></div>
+        </div>
+
+        <div id="highscoresPanel" class="highscores-panel highscores-compact">
+          <h2>Top 3 High Scores</h2>
+          <ol id="highscores"></ol>
+        </div>
+      </section>
+
+      <section class="play-area">
         <div class="tower-panel">
           <h2>Tower</h2>
           <div id="towerZone" class="tower-zone">
             <div id="tower" class="tower"></div>
-            <div class="drop-hint">Drop cards here</div>
+            <div class="drop-hint">Suit matching is active. Color is visual only.</div>
           </div>
-        </div>
-
-        <div class="highscores-panel">
-          <h2>High Scores</h2>
-          <ol id="highscores"></ol>
         </div>
       </section>
     </main>
