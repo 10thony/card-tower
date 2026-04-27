@@ -13,6 +13,11 @@ const resetButton = document.getElementById("resetButton");
 const saveButton = document.getElementById("saveButton");
 const highscoresEl = document.getElementById("highscores");
 const playerNameInput = document.getElementById("playerNameInput");
+const panelToggleButtons = Array.from(document.querySelectorAll(".hud-toggle-button"));
+const hudPanels = new Map(
+  Array.from(document.querySelectorAll("[data-panel]")).map((panel) => [panel.dataset.panel, panel])
+);
+const draggableOverlays = Array.from(document.querySelectorAll(".draggable-overlay"));
 
 const CARD_WIDTH = 74;
 const CARD_HEIGHT = 108;
@@ -71,6 +76,7 @@ let pokedexWarmPromise = null;
 const evolutionByDex = new Map();
 const pokemonNameByDex = new Map();
 let pendingTapPlacement = null;
+let activeOverlayDrag = null;
 
 function makeCardFromSuit(suit) {
   return {
@@ -128,6 +134,23 @@ function createRandomPokedexCard() {
   }
   const randomIndex = Math.floor(Math.random() * pokedexPool.length);
   return makeCardFromPokemon(pokedexPool[randomIndex]);
+}
+
+function pickFinalEvolutionCard(cards) {
+  if (!cards.length) {
+    return null;
+  }
+  return cards.reduce((best, candidate) => {
+    const bestStage = Number(best?.evolutionStage || 0);
+    const candidateStage = Number(candidate?.evolutionStage || 0);
+    if (candidateStage > bestStage) {
+      return candidate;
+    }
+    if (candidateStage === bestStage && Number(candidate.dexNumber || 0) > Number(best.dexNumber || 0)) {
+      return candidate;
+    }
+    return best;
+  }, cards[0]);
 }
 
 function createNextCard() {
@@ -311,12 +334,20 @@ function createBoardCardEl(card) {
     cardEl.classList.add(getPokemonTypeClass(card.pokemonType1));
   }
 
-  if (card.kind === "pokemon" && card.type === "normal") {
+  if (card.kind === "pokemon") {
     cardEl.classList.add("pokemon-card");
+    const badgeMap = {
+      type: "TYPE",
+      evolved: "EVOLVED",
+      suite: "SUITE",
+      super: "SUPER"
+    };
+    const specialBadge = card.type !== "normal" ? `<span class="pokemon-special-badge">${badgeMap[card.type] || "SPECIAL"}</span>` : "";
     cardEl.innerHTML = `
       <img src="${card.imageUrl}" alt="${card.name}" />
       <span class="pokemon-name">${card.name}</span>
       <span class="pokemon-dex">${formatDexLabel(card)}</span>
+      ${specialBadge}
     `;
   } else if (card.type === "normal") {
     cardEl.textContent = formatCardFace(card);
@@ -358,6 +389,19 @@ function redrawTower() {
 function isInsideTowerZone(clientX, clientY) {
   const rect = towerZone.getBoundingClientRect();
   return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+}
+
+function getOverlayAtPoint(clientX, clientY) {
+  const target = document.elementFromPoint(clientX, clientY);
+  if (!target) {
+    return null;
+  }
+  return target.closest(".draggable-overlay");
+}
+
+function isPointInsideVisibleOverlay(clientX, clientY) {
+  const overlay = getOverlayAtPoint(clientX, clientY);
+  return Boolean(overlay && !overlay.classList.contains("is-hidden"));
 }
 
 function getGridCoordsFromPointer(clientX, clientY) {
@@ -727,21 +771,35 @@ function resolveClassicCombos(cards) {
 }
 
 function resolvePokedexCombos(cards) {
-  const horizontalTypeGroups = buildContiguousGroups(
-    cards,
-    "row",
-    "col",
-    (left, right, anchor) => left.pokemonType1 === right.pokemonType1 && right.pokemonType1 === anchor.pokemonType1
-  );
-  const verticalTypeGroups = buildContiguousGroups(
+  const bottomRow = getRowsCapacity() - 1;
+  const requiredColumnHeight = bottomRow + 1;
+  const summitWindow = buildContiguousGroups(
     cards,
     "col",
     "row",
     (left, right, anchor) => left.pokemonType1 === right.pokemonType1 && right.pokemonType1 === anchor.pokemonType1
   );
+  const nextType = nextCard?.kind === "pokemon" ? nextCard.pokemonType1 : null;
   const typeDescriptors = mergeDescriptorCards(
-    mergeOverlappingGroups([...horizontalTypeGroups, ...verticalTypeGroups])
-      .filter((group) => group.length >= TYPE_COMBO_MIN_CARDS)
+    mergeOverlappingGroups(summitWindow)
+      .filter((group) => {
+        const sortedByRow = [...group].sort((left, right) => left.row - right.row);
+        const topCard = sortedByRow[0];
+        const bottomCard = sortedByRow[sortedByRow.length - 1];
+        const reachesTop = Number(topCard.row) === 0;
+        const anchoredOnBottom = Number(bottomCard.row) === bottomRow;
+        const isSingleColumn = group.every((card) => card.col === topCard.col);
+        const fillsEntireColumn = group.length >= requiredColumnHeight;
+        const groupType = topCard.pokemonType1;
+        return Boolean(
+          reachesTop &&
+          anchoredOnBottom &&
+          isSingleColumn &&
+          fillsEntireColumn &&
+          nextType &&
+          nextType === groupType
+        );
+      })
       .map((group) => ({
         type: "type",
         comboKey: `type:${group[0].pokemonType1}`,
@@ -800,7 +858,10 @@ function removeCardsForComboDescriptors(descriptors) {
 
 function createSpecialCardsFromDescriptors(descriptors) {
   descriptors.forEach((descriptor) => {
-    const anchorCard = descriptor.cards[Math.floor(Math.random() * descriptor.cards.length)];
+    const anchorCard =
+      descriptor.type === "evolved"
+        ? pickFinalEvolutionCard(descriptor.cards)
+        : descriptor.cards[Math.floor(Math.random() * descriptor.cards.length)];
     const suit = anchorCard.suit;
     const suitName = anchorCard.suitName;
     const color = anchorCard.color;
@@ -824,12 +885,13 @@ function createSpecialCardsFromDescriptors(descriptors) {
       value
     };
 
-    if (anchorCard.kind === "pokemon") {
+    if (anchorCard && anchorCard.kind === "pokemon") {
       const typeLabel = String(anchorCard.pokemonType1 || "unknown");
       if (descriptor.type === "evolved") {
-        const finalDex = Number(anchorCard.evolutionFinalDex || anchorCard.dexNumber);
+        const finalEvolutionCard = pickFinalEvolutionCard(descriptor.cards) || anchorCard;
+        const finalDex = Number(finalEvolutionCard.evolutionFinalDex || finalEvolutionCard.dexNumber);
         specialCard.kind = "pokemon";
-        specialCard.name = String(anchorCard.evolutionFinalName || anchorCard.name);
+        specialCard.name = String(finalEvolutionCard.evolutionFinalName || finalEvolutionCard.name);
         specialCard.dexNumber = finalDex;
         specialCard.imageUrl = getPokemonImageUrl(finalDex);
         specialCard.pokemonType1 = typeLabel;
@@ -949,29 +1011,57 @@ function placeDrawnCard(clientX, clientY) {
     return;
   }
 
-  if (getCardAt(targetCol, targetRow)) {
+  let finalCol = targetCol;
+  let finalRow = targetRow;
+  if (getCardAt(finalCol, finalRow)) {
+    const nearestSlot = findNearestOpenSlot(finalCol, finalRow);
+    if (!nearestSlot) {
+      triggerGameOver();
+      redrawTower();
+      return;
+    }
+    finalCol = nearestSlot.col;
+    finalRow = nearestSlot.row;
+  }
+
+  if (!isValidTowerPlacement(finalCol, finalRow)) {
     triggerGameOver();
     redrawTower();
     return;
   }
 
-  if (!isValidTowerPlacement(targetCol, targetRow)) {
-    triggerGameOver();
-    redrawTower();
-    return;
-  }
-
-  setCardAt(targetCol, targetRow, nextCard);
+  setCardAt(finalCol, finalRow, nextCard);
   score += CARD_BASE_POINTS;
   redrawTower();
+
+  if (currentMode === GAME_MODE.POKEDEX) {
+    createNextCard();
+  }
 
   resolveAllCombos();
   redrawTower();
 
-  createNextCard();
-  if (currentMode === GAME_MODE.CLASSIC && !nextCard) {
-    triggerDeckComplete();
+  if (currentMode === GAME_MODE.CLASSIC) {
+    createNextCard();
+    if (!nextCard) {
+      triggerDeckComplete();
+    }
   }
+}
+
+function applyHudPanelState(panelKey) {
+  const panel = hudPanels.get(panelKey);
+  if (!panel) {
+    return;
+  }
+  const shouldHide = !panel.classList.contains("is-hidden");
+  panel.classList.toggle("is-hidden", shouldHide);
+  panelToggleButtons.forEach((button) => {
+    const key = button.dataset.togglePanel;
+    if (key === panelKey) {
+      button.classList.toggle("active", !shouldHide);
+    }
+  });
 }
 
 function startDrag(clientX, clientY) {
@@ -1017,7 +1107,7 @@ function endDrag(clientX, clientY) {
     return;
   }
 
-  if (isInsideTowerZone(clientX, clientY)) {
+  if (isInsideTowerZone(clientX, clientY) && !isPointInsideVisibleOverlay(clientX, clientY)) {
     placeDrawnCard(clientX, clientY);
   }
 
@@ -1033,6 +1123,65 @@ function shouldStartDragFromEvent(event) {
     return event.button === 0;
   }
   return true;
+}
+
+function clampOverlayPosition(overlay, left, top) {
+  const gameRect = document.querySelector(".game").getBoundingClientRect();
+  const topBarRect = document.querySelector(".top-bar").getBoundingClientRect();
+  const overlayWidth = overlay.offsetWidth || 0;
+  const overlayHeight = overlay.offsetHeight || 0;
+  const containerWidth = topBarRect.width;
+  const containerHeight = topBarRect.height;
+  const minLeft = 0;
+  const minTop = 0;
+  const maxLeft = Math.max(0, containerWidth - overlayWidth);
+  const maxTop = Math.max(0, containerHeight - overlayHeight);
+  const clampedLeft = Math.max(minLeft, Math.min(maxLeft, left - (topBarRect.left - gameRect.left)));
+  const clampedTop = Math.max(minTop, Math.min(maxTop, top - (topBarRect.top - gameRect.top)));
+  return { left: clampedLeft, top: clampedTop };
+}
+
+function startOverlayDrag(event, overlay) {
+  if (!overlay || window.matchMedia("(max-width: 980px)").matches) {
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  const rect = overlay.getBoundingClientRect();
+  activeOverlayDrag = {
+    overlay,
+    pointerId: event.pointerId,
+    offsetX: event.clientX - rect.left,
+    offsetY: event.clientY - rect.top
+  };
+  overlay.classList.add("dragging-overlay");
+  try {
+    overlay.setPointerCapture(event.pointerId);
+  } catch {
+    // Pointer capture can fail on some devices.
+  }
+}
+
+function moveOverlayDrag(event) {
+  if (!activeOverlayDrag || activeOverlayDrag.pointerId !== event.pointerId) {
+    return;
+  }
+  event.preventDefault();
+  const rawLeft = event.clientX - activeOverlayDrag.offsetX;
+  const rawTop = event.clientY - activeOverlayDrag.offsetY;
+  const clamped = clampOverlayPosition(activeOverlayDrag.overlay, rawLeft, rawTop);
+  activeOverlayDrag.overlay.style.left = `${clamped.left}px`;
+  activeOverlayDrag.overlay.style.top = `${clamped.top}px`;
+  activeOverlayDrag.overlay.style.right = "auto";
+}
+
+function endOverlayDrag(event) {
+  if (!activeOverlayDrag || activeOverlayDrag.pointerId !== event.pointerId) {
+    return;
+  }
+  const overlay = activeOverlayDrag.overlay;
+  overlay.classList.remove("dragging-overlay");
+  activeOverlayDrag = null;
 }
 
 async function loadPokedexPool(limit = INITIAL_POKEDEX_POOL_SIZE, { force = false } = {}) {
@@ -1167,6 +1316,7 @@ dragCard.addEventListener("pointerdown", (event) => {
     return;
   }
   event.preventDefault();
+  event.stopPropagation();
   try {
     dragCard.setPointerCapture(event.pointerId);
   } catch {
@@ -1265,6 +1415,34 @@ if (toggleModeButton) {
     resetGame();
   });
 }
+
+panelToggleButtons.forEach((button) => {
+  const panelKey = button.dataset.togglePanel;
+  if (!panelKey || !hudPanels.has(panelKey)) {
+    return;
+  }
+  button.addEventListener("click", () => {
+    applyHudPanelState(panelKey);
+  });
+});
+
+draggableOverlays.forEach((overlay) => {
+  overlay.addEventListener("pointerdown", (event) => {
+    if (isDragging) {
+      return;
+    }
+    if (event.target.closest("#dragCard")) {
+      return;
+    }
+    if (event.target.closest("button, input, label, a, select, textarea")) {
+      return;
+    }
+    startOverlayDrag(event, overlay);
+  });
+  overlay.addEventListener("pointermove", moveOverlayDrag);
+  overlay.addEventListener("pointerup", endOverlayDrag);
+  overlay.addEventListener("pointercancel", endOverlayDrag);
+});
 
 saveButton.addEventListener("click", async () => {
   if (!board.size) {

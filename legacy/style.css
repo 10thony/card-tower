@@ -20,7 +20,7 @@
 
 body {
   margin: 0;
-  min-height: 100vh;
+  height: 100vh;
   font-family: "Manrope", "Segoe UI", sans-serif;
   color: var(--ivory);
   user-select: none;
@@ -28,22 +28,27 @@ body {
     radial-gradient(circle at 15% 20%, rgba(255, 232, 187, 0.18), transparent 42%),
     radial-gradient(circle at 82% 16%, rgba(255, 196, 117, 0.12), transparent 45%),
     linear-gradient(160deg, #0b2e2b, #154542 42%, #1d5d58 100%);
+  overflow: hidden;
 }
 
 .game {
-  width: min(1240px, 100%);
+  width: min(1400px, 100%);
   margin: 0 auto;
   padding: 22px;
   touch-action: manipulation;
   overscroll-behavior: contain;
+  height: 100vh;
+  position: relative;
 }
 
 .top-bar {
-  display: grid;
-  grid-template-columns: minmax(290px, 1fr) auto auto auto;
-  gap: 14px;
-  align-items: start;
-  margin-bottom: 14px;
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  top: 22px;
+  bottom: 22px;
+  z-index: 30;
+  pointer-events: none;
 }
 
 h1,
@@ -54,6 +59,10 @@ p {
 
 .title-wrap {
   padding: 10px 8px 8px;
+  border-radius: 12px;
+  background: rgba(10, 38, 35, 0.88);
+  border: 1px solid rgba(250, 228, 172, 0.38);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.22);
 }
 
 h1 {
@@ -93,8 +102,7 @@ h1 {
 }
 
 .play-area {
-  display: grid;
-  grid-template-columns: 1fr;
+  height: 100%;
 }
 
 .deck-panel,
@@ -119,12 +127,64 @@ h1 {
 /* Top widgets should blend into the header surface (no panel chrome). */
 .top-bar .deck-panel,
 .top-bar .highscores-panel,
-.top-bar .score-box {
+.top-bar .score-box,
+.top-bar .core-box {
   min-height: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+}
+
+.hud-toggle-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 45;
+}
+
+.hud-toggle-button {
+  width: 38px;
+  height: 38px;
+  margin: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(244, 214, 144, 0.88);
+  background: rgba(10, 40, 37, 0.78);
+  color: #fff6d6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.hud-toggle-button svg {
+  pointer-events: none;
+}
+
+.hud-toggle-button.active {
+  background: linear-gradient(180deg, var(--gold), var(--gold-deep));
+  color: #2f250e;
+}
+
+[data-panel].is-hidden {
+  display: none;
+}
+
+[data-panel] {
+  pointer-events: auto;
+}
+
+.draggable-overlay {
+  touch-action: none;
+}
+
+.draggable-overlay.dragging-overlay {
+  opacity: 0.96;
+  cursor: grabbing;
 }
 
 .score-box {
@@ -138,6 +198,14 @@ h1 {
   color: #fef7dc;
 }
 
+.core-box {
+  min-width: 250px;
+  border-radius: 12px;
+  background: rgba(10, 38, 35, 0.88);
+  border: 1px solid rgba(250, 228, 172, 0.44);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.26);
+}
+
 .score-box span {
   color: #ffe39a;
 }
@@ -145,6 +213,14 @@ h1 {
 .deck-panel-compact {
   width: 220px;
   padding: 8px 6px;
+  border-radius: 12px;
+  background: rgba(10, 38, 35, 0.88);
+  border: 1px solid rgba(250, 228, 172, 0.44);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.26);
+  position: absolute;
+  left: 270px;
+  top: 50px;
+  z-index: 40;
 }
 
 .deck-panel-compact h2,
@@ -160,6 +236,29 @@ h1 {
 .highscores-compact {
   width: 260px;
   padding: 8px 6px;
+  border-radius: 12px;
+  background: rgba(10, 38, 35, 0.88);
+  border: 1px solid rgba(250, 228, 172, 0.44);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.26);
+  position: absolute;
+  right: 0;
+  top: 50px;
+  z-index: 40;
+}
+
+.title-wrap {
+  position: absolute;
+  left: 0;
+  top: 50px;
+  width: 320px;
+  z-index: 40;
+}
+
+.core-box {
+  position: absolute;
+  left: 520px;
+  top: 50px;
+  z-index: 40;
 }
 
 .deck {
@@ -331,11 +430,14 @@ button:active {
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+  height: 100%;
+  min-height: 100%;
 }
 
 .tower-zone {
   position: relative;
-  height: 520px;
+  height: 100%;
+  min-height: 100%;
   overflow: hidden;
   touch-action: none;
   border: 2px dashed rgba(242, 215, 143, 0.78);
@@ -427,6 +529,18 @@ button:active {
   font-weight: 700;
   letter-spacing: 0.2px;
   color: #315957;
+}
+
+.pokemon-special-badge {
+  margin-top: 2px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-family: "Manrope", "Segoe UI", sans-serif;
+  font-size: 0.48rem;
+  font-weight: 900;
+  letter-spacing: 0.35px;
+  color: #fdf4dc;
+  background: rgba(20, 38, 36, 0.68);
 }
 
 .card.pokemon-card,
@@ -617,8 +731,24 @@ button:active {
 }
 
 @media (max-width: 980px) {
+  body {
+    overflow: auto;
+  }
+
+  .game {
+    height: auto;
+    display: block;
+    position: static;
+  }
+
   .top-bar {
-    grid-template-columns: 1fr;
+    position: static;
+    left: auto;
+    right: auto;
+    top: auto;
+    z-index: auto;
+    pointer-events: auto;
+    display: block;
   }
 
   .deck-panel-compact,
@@ -635,5 +765,17 @@ button:active {
 
   .deck-actions {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .tower-zone {
+    min-height: 520px;
+  }
+
+  .hud-toggle-bar,
+  .title-wrap,
+  .deck-panel-compact,
+  .core-box,
+  .highscores-compact {
+    position: static;
   }
 }

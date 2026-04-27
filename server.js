@@ -94,11 +94,42 @@ function normalizePokedexLimit(rawLimit, fallback = MIN_POKEDEX_CARD_COUNT) {
   return Math.max(1, Math.min(DEFAULT_POKEDEX_CARD_COUNT, Math.floor(parsed)));
 }
 
+function dedupePokedexCardsByName(cards) {
+  const byName = new Map();
+  cards.forEach((card) => {
+    const key = String(card.name || "").trim().toLowerCase();
+    if (!key) {
+      return;
+    }
+    const existing = byName.get(key);
+    if (!existing || Number(card.dexNumber || 0) < Number(existing.dexNumber || 0)) {
+      byName.set(key, card);
+    }
+  });
+  return Array.from(byName.values()).sort((a, b) => a.dexNumber - b.dexNumber);
+}
+
 async function fetchPokedexCards(limit) {
   const safeLimit = normalizePokedexLimit(limit, MIN_POKEDEX_CARD_COUNT);
   const querySource = `(await ctx.db.query("pokedex").withIndex("by_dex_number").take(${safeLimit})).map((entry)=>{const dexNumber=Number(entry.national_number ?? entry.dexNumber ?? 0);const name=String(entry.english_name ?? entry.name ?? "Unknown");const type1=String(entry.primary_type ?? entry.type1 ?? "unknown");const type2Raw=entry.secondary_type ?? entry.type2 ?? null;const type2=type2Raw ? String(type2Raw) : null;return { dexNumber, name, type1, type2 };})`;
-  const cards = await runConvexInlineQuery(querySource);
-  return cards.filter((card) => Number.isFinite(card.dexNumber) && card.dexNumber > 0);
+  const fallbackQuerySource = `(await ctx.db.query("pokedex").take(${DEFAULT_POKEDEX_CARD_COUNT})).map((entry)=>{const dexNumber=Number(entry.national_number ?? entry.dexNumber ?? 0);const name=String(entry.english_name ?? entry.name ?? "Unknown");const type1=String(entry.primary_type ?? entry.type1 ?? "unknown");const type2Raw=entry.secondary_type ?? entry.type2 ?? null;const type2=type2Raw ? String(type2Raw) : null;return { dexNumber, name, type1, type2 };})`;
+
+  try {
+    const cards = await runConvexInlineQuery(querySource);
+    return dedupePokedexCardsByName(
+      cards.filter((card) => Number.isFinite(card.dexNumber) && card.dexNumber > 0)
+    );
+  } catch (error) {
+    const message = String(error?.message || error || "");
+    if (!message.includes("backfilling")) {
+      throw error;
+    }
+
+    const fallbackCards = await runConvexInlineQuery(fallbackQuerySource);
+    return dedupePokedexCardsByName(
+      fallbackCards.filter((card) => Number.isFinite(card.dexNumber) && card.dexNumber > 0)
+    ).slice(0, safeLimit);
+  }
 }
 
 async function refreshPokedexCache(limit) {
@@ -239,7 +270,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Card Tower game running at http://localhost:${PORT}`);
+  console.log(`PokiStack game running at http://localhost:${PORT}`);
   refreshPokedexCache(MIN_POKEDEX_CARD_COUNT)
     .then(() => {
       refreshPokedexCache(DEFAULT_POKEDEX_CARD_COUNT).catch(() => {

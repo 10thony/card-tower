@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>PokiStack Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="game">
+      <section class="top-bar">
+        <div class="hud-toggle-bar draggable-overlay" aria-label="HUD panel toggles">
+          <button class="hud-toggle-button" data-toggle-panel="title" aria-label="Toggle rules panel" title="Rules">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          </button>
+          <button class="hud-toggle-button active" data-toggle-panel="deck" aria-label="Toggle deck panel" title="Deck">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13h.01"/><path d="M12 6v3"/><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg>
+          </button>
+          <button class="hud-toggle-button" data-toggle-panel="score" aria-label="Toggle score panel" title="Score">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="10" y1="12" y2="12"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="15" x2="15.01" y1="13" y2="13"/><line x1="18" x2="18.01" y1="11" y2="11"/><rect width="20" height="12" x="2" y="6" rx="2"/></svg>
+          </button>
+          <button class="hud-toggle-button" data-toggle-panel="highscores" aria-label="Toggle high scores panel" title="High scores">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14.66v1.626a2 2 0 0 1-.976 1.696A5 5 0 0 0 7 21.978"/><path d="M14 14.66v1.626a2 2 0 0 0 .976 1.696A5 5 0 0 1 17 21.978"/><path d="M18 9h1.5a1 1 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6 9H4.5a1 1 0 0 1 0-5H6"/></svg>
+          </button>
+        </div>
+
+        <div class="title-wrap is-hidden draggable-overlay" data-panel="title">
+          <h1>PokiStack</h1>
+          <p id="gameRulesText">Build your tower by matching Pokemon primary types in connected lines. Every drop is worth 5 points, type combos create golden bonus cards, and chain evolutions can trigger bigger multipliers. A bad drop still ends the run, so build from the bottom up.</p>
+          <div class="mode-switch">
+            <span id="modeLabel">Mode: Pokedex Deck</span>
+          </div>
+        </div>
+
+        <div class="deck-panel deck-panel-compact draggable-overlay" data-panel="deck">
+          <h2>Deck</h2>
+          <div id="deck" class="deck">
+            <div id="dragCard" class="card" role="button" tabindex="0">
+              🂠
+            </div>
+          </div>
+          <p id="nextCardInfo" class="next-card-info"></p>
+          <p id="deckCountInfo" class="deck-count-info"></p>
+          <div class="deck-actions">
+            <div class="player-name-field">
+              <label for="playerNameInput">Player Name</label>
+              <input id="playerNameInput" type="text" maxlength="20" placeholder="Kiddo" />
+            </div>
+            <button id="resetButton">New Tower</button>
+            <button id="saveButton">Save Score</button>
+          </div>
+        </div>
+
+        <div class="core-box is-hidden draggable-overlay" data-panel="score">
+          <div class="score-box">
+          <div>Cards: <span id="cardCount">0</span></div>
+          <div>Rows: <span id="rowCount">0</span></div>
+          <div>Score: <span id="score">0</span></div>
+          <div>Rule: <span id="ruleText">Suit Match</span></div>
+          </div>
+        </div>
+
+        <div id="highscoresPanel" class="highscores-panel highscores-compact is-hidden draggable-overlay" data-panel="highscores">
+          <h2>Top 3 High Scores</h2>
+          <ol id="highscores"></ol>
+        </div>
+      </section>
+
+      <section class="play-area">
+        <div class="tower-panel">
+          <div id="towerZone" class="tower-zone">
+            <div id="tower" class="tower"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="game.js"></script>
+  </body>
+</html>
