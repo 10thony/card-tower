@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../convex/_generated/api";
 import "./modern-game.css";
@@ -15,6 +16,8 @@ const POKEDEX_CACHE_KEY = "cardTower.pokedexPool.v1";
 const POKEDEX_CACHE_TTL_MS = 5 * 60 * 1000;
 const PLAYER_NAME_CACHE_KEY = "cardTower.playerName.v1";
 const HIGHSCORES_CACHE_KEY = "cardTower.highscores.v1";
+const HUD_PANEL_OFFSET_KEY = "cardTower.hudPanelOffset.v1";
+const DECK_PANEL_OFFSET_KEY = "cardTower.deckPanelOffset.v1";
 const TAP_MOVE_THRESHOLD_PX = 12;
 const convexUrl = import.meta.env.VITE_CONVEX_URL as string | undefined;
 
@@ -163,6 +166,36 @@ function createShuffledDeck() {
   return cards;
 }
 
+type PanelOffset = { x: number; y: number };
+
+function readPanelOffset(storageKey: string): PanelOffset {
+  try {
+    const raw = sessionStorage.getItem(storageKey);
+    if (!raw) return { x: 0, y: 0 };
+    const p = JSON.parse(raw) as { x?: number; y?: number };
+    const x = Number(p.x);
+    const y = Number(p.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return { x: 0, y: 0 };
+    return { x, y };
+  } catch {
+    return { x: 0, y: 0 };
+  }
+}
+
+function clampPanelOffset({ x, y }: PanelOffset): PanelOffset {
+  if (typeof window === "undefined") return { x, y };
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const minX = -100;
+  const minY = -50;
+  const maxX = Math.max(minX, w - 64);
+  const maxY = Math.max(minY, h - 64);
+  return {
+    x: Math.max(minX, Math.min(maxX, x)),
+    y: Math.max(minY, Math.min(maxY, y))
+  };
+}
+
 export function ModernGamePage() {
   const towerZoneRef = useRef<HTMLDivElement | null>(null);
   const resetGameRef = useRef<(targetMode: GameMode) => Promise<void>>(async () => {});
@@ -188,6 +221,16 @@ export function ModernGamePage() {
     score: true,
     highscores: true
   });
+  const [hudPanelOffset, setHudPanelOffset] = useState<PanelOffset>({ x: 0, y: 0 });
+  const [deckPanelOffset, setDeckPanelOffset] = useState<PanelOffset>({ x: 0, y: 0 });
+  const [panelDrag, setPanelDrag] = useState<{
+    kind: "hud" | "deck";
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+  } | null>(null);
 
   const evolutionByDex = useMemo(() => {
     const map = new Map<number, { chainId: string; stage: number; finalDex: number; finalName: string }>();
@@ -607,6 +650,15 @@ export function ModernGamePage() {
   );
 
   const loadHighscores = useCallback(async () => {
+    if (convexUrl) {
+      try {
+        const payload = (await getConvexClient().query(api.cardTowerHighscores.list, {})) as Highscore[];
+        setHighscores(Array.isArray(payload) ? payload : []);
+      } catch {
+        setHighscores([]);
+      }
+      return;
+    }
     try {
       const payload = JSON.parse(localStorage.getItem(HIGHSCORES_CACHE_KEY) || "[]") as Highscore[];
       setHighscores(Array.isArray(payload) ? payload : []);
@@ -694,6 +746,62 @@ export function ModernGamePage() {
   }, [loadHighscores]);
 
   useEffect(() => {
+    setHudPanelOffset(readPanelOffset(HUD_PANEL_OFFSET_KEY));
+    setDeckPanelOffset(readPanelOffset(DECK_PANEL_OFFSET_KEY));
+  }, []);
+
+  useEffect(() => {
+    if (!panelDrag) return;
+    const { pointerId, startX, startY, originX, originY, kind } = panelDrag;
+    const onMove = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return;
+      event.preventDefault();
+      const next = clampPanelOffset({
+        x: originX + (event.clientX - startX),
+        y: originY + (event.clientY - startY)
+      });
+      if (kind === "hud") {
+        setHudPanelOffset(next);
+      } else {
+        setDeckPanelOffset(next);
+      }
+    };
+    const onEnd = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return;
+      if (kind === "hud") {
+        setHudPanelOffset((pos) => {
+          const c = clampPanelOffset(pos);
+          try {
+            sessionStorage.setItem(HUD_PANEL_OFFSET_KEY, JSON.stringify(c));
+          } catch {
+            // storage full or private mode
+          }
+          return c;
+        });
+      } else {
+        setDeckPanelOffset((pos) => {
+          const c = clampPanelOffset(pos);
+          try {
+            sessionStorage.setItem(DECK_PANEL_OFFSET_KEY, JSON.stringify(c));
+          } catch {
+            // ignore
+          }
+          return c;
+        });
+      }
+      setPanelDrag(null);
+    };
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onEnd);
+    window.addEventListener("pointercancel", onEnd);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
+    };
+  }, [panelDrag]);
+
+  useEffect(() => {
     resetGameRef.current = resetGame;
   }, [resetGame]);
 
@@ -749,6 +857,16 @@ export function ModernGamePage() {
     }
     try {
       localStorage.setItem(PLAYER_NAME_CACHE_KEY, name);
+      if (convexUrl) {
+        const nextScores = (await getConvexClient().mutation(api.cardTowerHighscores.submit, {
+          name,
+          score,
+          cards: board.size,
+          rows: rowsUsed
+        })) as Highscore[];
+        setHighscores(Array.isArray(nextScores) ? nextScores : []);
+        return;
+      }
       const existing = JSON.parse(localStorage.getItem(HIGHSCORES_CACHE_KEY) || "[]") as Highscore[];
       const nextScores = [
         ...existing,
@@ -768,10 +886,58 @@ export function ModernGamePage() {
     }
   };
 
+  const onHudDragHandlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (panelDrag || isDragging) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setPanelDrag({
+      kind: "hud",
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: hudPanelOffset.x,
+      originY: hudPanelOffset.y
+    });
+  };
+
+  const onDeckPanelPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (panelDrag || isDragging) return;
+    const el = event.target;
+    if (!(el instanceof Element)) return;
+    if (el.closest(".deck-tower-card-preview")) return;
+    if (el.closest("button, input, textarea, label, a")) return;
+    event.preventDefault();
+    setPanelDrag({
+      kind: "deck",
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: deckPanelOffset.x,
+      originY: deckPanelOffset.y
+    });
+  };
+
   return (
     <main className="modern-game-page game">
       <section className="top-bar">
-        <div className="hud-toggle-bar draggable-overlay" aria-label="HUD panel toggles">
+        <div
+          className={`hud-toggle-bar draggable-overlay ${panelDrag?.kind === "hud" ? "is-panel-dragging" : ""}`}
+          aria-label="HUD panel toggles"
+          style={
+            {
+              ["--hud-ox" as string]: `${hudPanelOffset.x}px`,
+              ["--hud-oy" as string]: `${hudPanelOffset.y}px`
+            } as CSSProperties
+          }
+        >
+          <div
+            className="hud-drag-handle"
+            title="Drag to move"
+            aria-label="Drag to reposition HUD"
+            onPointerDown={onHudDragHandlePointerDown}
+          >
+            <span className="hud-drag-grip" aria-hidden />
+          </div>
           <button className={`hud-toggle-button ${panelHidden.title ? "" : "active"}`} onClick={() => setPanelHidden((prev) => ({ ...prev, title: !prev.title }))}>
             i
           </button>
@@ -798,11 +964,21 @@ export function ModernGamePage() {
           </div>
         </div>
 
-        <div className={`deck-panel deck-panel-compact draggable-overlay ${panelHidden.deck ? "is-hidden" : ""}`} data-panel="deck">
+        <div
+          className={`deck-panel deck-panel-compact draggable-overlay ${panelHidden.deck ? "is-hidden" : ""} ${panelDrag?.kind === "deck" ? "is-panel-dragging" : ""}`}
+          data-panel="deck"
+          style={
+            {
+              ["--panel-ox" as string]: `${deckPanelOffset.x}px`,
+              ["--panel-oy" as string]: `${deckPanelOffset.y}px`
+            } as CSSProperties
+          }
+          onPointerDown={onDeckPanelPointerDown}
+        >
           <h2>Deck</h2>
           <div className="deck">
               <div
-              className={`card ${nextCard?.color || ""} ${nextCard?.kind === "pokemon" ? `pokemon-card pokemon-preview ${getPokemonTypeClass(nextCard.pokemonType1)}` : ""} ${!nextCard ? "deck-empty" : ""}`}
+              className={`card deck-tower-card-preview ${nextCard?.color || ""} ${nextCard?.kind === "pokemon" ? `pokemon-card pokemon-preview ${getPokemonTypeClass(nextCard.pokemonType1)}` : ""} ${!nextCard ? "deck-empty" : ""}`}
               role="button"
               tabIndex={0}
               onPointerDown={(event) => {
@@ -885,8 +1061,8 @@ export function ModernGamePage() {
           <h2>Top 3 High Scores</h2>
           <ol>
             {highscores.length ? (
-              highscores.slice(0, 3).map((entry) => (
-                <li key={`${entry.name}-${entry.score}`}>
+              highscores.slice(0, 3).map((entry, index) => (
+                <li key={`${index}-${entry.name}-${entry.score}`}>
                   {entry.name}: {entry.score} points ({entry.cards} cards, {entry.rows} rows)
                 </li>
               ))

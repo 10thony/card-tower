@@ -1,5 +1,22 @@
 @import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Manrope:wght@500;700;800&display=swap");
 
+html:has(.modern-game-page) {
+  height: 100%;
+  overflow: hidden;
+}
+
+body:has(.modern-game-page) {
+  height: 100%;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+#root:has(.modern-game-page) {
+  height: 100%;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
 .modern-game-page {
   --felt-dark: #0f3b37;
   --felt-mid: #1f5c56;
@@ -71,6 +88,39 @@
   left: 0;
   top: 0;
   z-index: 45;
+  transform: translate(var(--hud-ox, 0px), var(--hud-oy, 0px));
+}
+
+.modern-game-page .hud-toggle-bar.is-panel-dragging {
+  z-index: 220;
+}
+
+.modern-game-page .hud-drag-handle {
+  flex-shrink: 0;
+  width: 24px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+  border-radius: 8px;
+  color: rgba(255, 246, 214, 0.6);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.modern-game-page .hud-toggle-bar.is-panel-dragging .hud-drag-handle {
+  cursor: grabbing;
+}
+
+.modern-game-page .hud-drag-grip {
+  display: block;
+  width: 8px;
+  height: 18px;
+  background: repeating-linear-gradient(180deg, currentColor 0 2px, transparent 2px 5px);
+  opacity: 0.9;
+  border-radius: 1px;
 }
 
 .modern-game-page .hud-toggle-button {
@@ -94,6 +144,11 @@
 
 .modern-game-page [data-panel] {
   pointer-events: auto;
+}
+
+.modern-game-page .draggable-overlay {
+  touch-action: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modern-game-page h1 {
@@ -135,6 +190,11 @@
   left: 270px;
   top: 50px;
   z-index: 40;
+  transform: translate(var(--panel-ox, 0px), var(--panel-oy, 0px));
+}
+
+.modern-game-page .deck-panel-compact.is-panel-dragging {
+  z-index: 220;
 }
 
 .modern-game-page .core-box {
@@ -481,29 +541,131 @@
   color: #3b2a0b;
 }
 
+/* Phone / narrow: full-viewport tower + HUD as overlays (no document scroll). */
 @media (max-width: 980px) {
   .modern-game-page {
-    height: auto;
-    min-height: 100vh;
+    --mg-safe-top: env(safe-area-inset-top, 0px);
+    --mg-safe-right: env(safe-area-inset-right, 0px);
+    --mg-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --mg-safe-left: env(safe-area-inset-left, 0px);
+    --hud-h: 38px;
+    --hud-pad: 8px;
+    --hud-top: calc(var(--mg-safe-top) + var(--hud-pad));
+    --panel-below-hud: calc(var(--hud-top) + var(--hud-h) + 6px);
+
+    height: 100dvh;
+    max-height: 100dvh;
+    min-height: 100dvh;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .modern-game-page .play-area {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    height: 100%;
   }
 
   .modern-game-page .top-bar {
-    position: static;
-    pointer-events: auto;
+    position: absolute;
+    inset: 0;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 30;
+    pointer-events: none;
   }
 
-  .modern-game-page .hud-toggle-bar,
-  .modern-game-page .title-wrap,
-  .modern-game-page .deck-panel-compact,
-  .modern-game-page .core-box,
-  .modern-game-page .highscores-compact {
-    position: static;
+  .modern-game-page .hud-toggle-bar {
+    left: max(var(--hud-pad), var(--mg-safe-left));
+    top: var(--hud-top);
+  }
+
+  .modern-game-page .hud-toggle-button {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .modern-game-page .deck-panel-compact {
+    position: absolute;
+    left: 50%;
+    right: auto;
+    top: var(--panel-below-hud);
+    width: min(300px, calc(100vw - 16px));
+    max-width: calc(100vw - var(--mg-safe-left) - var(--mg-safe-right) - 12px);
+    max-height: min(72dvh, 480px);
+    margin: 0;
+    transform: translateX(calc(-50% + var(--panel-ox, 0px))) translateY(var(--panel-oy, 0px));
+    overflow: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    z-index: 42;
+  }
+
+  .modern-game-page .title-wrap {
+    position: absolute;
+    left: max(8px, var(--mg-safe-left));
+    right: max(8px, var(--mg-safe-right));
+    top: var(--panel-below-hud);
+    width: auto;
+    max-width: none;
+    max-height: min(60dvh, 360px);
+    margin: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    z-index: 41;
+  }
+
+  .modern-game-page .core-box {
+    position: absolute;
+    top: var(--panel-below-hud);
+    right: max(8px, var(--mg-safe-right));
+    left: auto;
+    width: min(200px, calc(100vw - 120px));
+    max-height: min(50dvh, 280px);
+    margin: 0;
+    overflow: auto;
+    z-index: 43;
+  }
+
+  .modern-game-page .core-box .score-box {
+    min-width: 0;
     width: 100%;
-    margin-bottom: 10px;
+    font-size: clamp(1.05rem, 4.2vw, 1.55rem);
+    gap: 6px;
+  }
+
+  .modern-game-page .highscores-compact {
+    position: absolute;
+    top: auto;
+    left: max(8px, var(--mg-safe-left));
+    right: max(8px, var(--mg-safe-right));
+    bottom: max(8px, var(--mg-safe-bottom));
+    width: auto;
+    max-height: min(34dvh, 240px);
+    margin: 0;
+    overflow: auto;
+    z-index: 44;
+  }
+
+  .modern-game-page .tower-panel,
+  .modern-game-page .play-area,
+  .modern-game-page .tower-zone {
+    height: 100%;
   }
 
   .modern-game-page .tower-zone {
-    min-height: 520px;
+    min-height: 0;
+    border-radius: 0;
+  }
+
+  .modern-game-page .game-over-banner,
+  .modern-game-page .game-complete-banner {
+    max-width: calc(100vw - 20px);
+    text-align: center;
+    line-height: 1.2;
   }
 }
 
