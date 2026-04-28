@@ -133,9 +133,22 @@ body:has(.modern-game-page) {
   padding: 0;
 }
 
+.modern-game-page .hud-toggle-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  margin: 0 auto;
+  filter: brightness(0) saturate(100%) invert(94%) sepia(16%) saturate(308%) hue-rotate(336deg) brightness(102%) contrast(103%);
+  pointer-events: none;
+}
+
 .modern-game-page .hud-toggle-button.active {
   background: linear-gradient(180deg, var(--gold), var(--gold-deep));
   color: #2f250e;
+}
+
+.modern-game-page .hud-toggle-button.active .hud-toggle-icon {
+  filter: brightness(0) saturate(100%) invert(11%) sepia(9%) saturate(2783%) hue-rotate(13deg) brightness(95%) contrast(94%);
 }
 
 .modern-game-page [data-panel].is-hidden {

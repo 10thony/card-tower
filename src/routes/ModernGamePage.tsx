@@ -938,17 +938,37 @@ export function ModernGamePage() {
           >
             <span className="hud-drag-grip" aria-hidden />
           </div>
-          <button className={`hud-toggle-button ${panelHidden.title ? "" : "active"}`} onClick={() => setPanelHidden((prev) => ({ ...prev, title: !prev.title }))}>
-            i
+          <button
+            className={`hud-toggle-button ${panelHidden.title ? "" : "active"}`}
+            aria-label="Toggle game rules"
+            title="Game rules"
+            onClick={() => setPanelHidden((prev) => ({ ...prev, title: !prev.title }))}
+          >
+            <img className="hud-toggle-icon" src="/info.svg" alt="" aria-hidden />
           </button>
-          <button className={`hud-toggle-button ${panelHidden.deck ? "" : "active"}`} onClick={() => setPanelHidden((prev) => ({ ...prev, deck: !prev.deck }))}>
-            D
+          <button
+            className={`hud-toggle-button ${panelHidden.deck ? "" : "active"}`}
+            aria-label="Toggle deck panel"
+            title="Deck panel"
+            onClick={() => setPanelHidden((prev) => ({ ...prev, deck: !prev.deck }))}
+          >
+            <img className="hud-toggle-icon" src="/book-alert.svg" alt="" aria-hidden />
           </button>
-          <button className={`hud-toggle-button ${panelHidden.score ? "" : "active"}`} onClick={() => setPanelHidden((prev) => ({ ...prev, score: !prev.score }))}>
-            S
+          <button
+            className={`hud-toggle-button ${panelHidden.score ? "" : "active"}`}
+            aria-label="Toggle score panel"
+            title="Current score"
+            onClick={() => setPanelHidden((prev) => ({ ...prev, score: !prev.score }))}
+          >
+            <img className="hud-toggle-icon" src="/leaderboard-svgrepo-com.svg" alt="" aria-hidden />
           </button>
-          <button className={`hud-toggle-button ${panelHidden.highscores ? "" : "active"}`} onClick={() => setPanelHidden((prev) => ({ ...prev, highscores: !prev.highscores }))}>
-            H
+          <button
+            className={`hud-toggle-button ${panelHidden.highscores ? "" : "active"}`}
+            aria-label="Toggle highscores panel"
+            title="Highscores"
+            onClick={() => setPanelHidden((prev) => ({ ...prev, highscores: !prev.highscores }))}
+          >
+            <img className="hud-toggle-icon" src="/trophy.svg" alt="" aria-hidden />
           </button>
         </div>
 
