@@ -304,6 +304,14 @@ export function ModernGamePage() {
     return Math.max(1, Math.floor((zone.clientHeight - 16 + CELL_GAP_Y) / (CARD_HEIGHT + CELL_GAP_Y)));
   }, []);
 
+  const gridTopOffset = useCallback(() => {
+    const zone = towerZoneRef.current;
+    if (!zone) return 8;
+    const maxRows = Math.max(1, Math.floor((zone.clientHeight - 16 + CELL_GAP_Y) / (CARD_HEIGHT + CELL_GAP_Y)));
+    const bottomAlignedTop = zone.clientHeight - 8 - CARD_HEIGHT - (maxRows - 1) * (CARD_HEIGHT + CELL_GAP_Y);
+    return Math.max(8, bottomAlignedTop);
+  }, []);
+
   const cards = useMemo(() => Array.from(board.values()), [board]);
   const rowsUsed = useMemo(() => new Set(cards.map((card) => card.row)).size, [cards]);
 
@@ -403,15 +411,16 @@ export function ModernGamePage() {
     (clientX: number, clientY: number) => {
       const rect = towerZoneRef.current?.getBoundingClientRect();
       if (!rect) return { col: 0, row: 0 };
+      const topOffset = gridTopOffset();
       const localX = clientX - rect.left - 8;
-      const localY = clientY - rect.top - 8;
+      const localY = clientY - rect.top - topOffset;
       const maxCol = columns() - 1;
       const maxRow = rowsCapacity() - 1;
       const col = Math.max(0, Math.min(maxCol, Math.floor(localX / (CARD_WIDTH + CELL_GAP_X))));
       const row = Math.max(0, Math.min(maxRow, Math.floor(localY / (CARD_HEIGHT + CELL_GAP_Y))));
       return { col, row };
     },
-    [columns, rowsCapacity]
+    [columns, rowsCapacity, gridTopOffset]
   );
 
   const placeDrawnCard = useCallback(
@@ -1289,7 +1298,7 @@ export function ModernGamePage() {
                 .sort((a, b) => a.row - b.row || a.col - b.col)
                 .map((card) => {
                   const x = 8 + card.col * (CARD_WIDTH + CELL_GAP_X);
-                  const y = 8 + card.row * (CARD_HEIGHT + CELL_GAP_Y);
+                  const y = gridTopOffset() + card.row * (CARD_HEIGHT + CELL_GAP_Y);
                   const specialBadge =
                     card.type === "normal" ? null : (
                       <span className="pokemon-special-badge">
