@@ -1219,7 +1219,7 @@ export function ModernGamePage() {
           }
           onPointerDown={onDeckPanelPointerDown}
         >
-          <h2>Deck</h2>
+          <h2>{`Deck ${isDeckLoading ? "" : `• ${!nextCard ? (mode === GAME_MODE.POKEDEX ? "0 cards in cycle" : "0 cards left") : deckCountLabel}`}`}</h2>
           <div className="deck">
               <div
               className={`card deck-tower-card-preview ${nextCard?.color || ""} ${nextCard?.kind === "pokemon" ? `pokemon-card pokemon-preview ${getPokemonTypeClass(nextCard.pokemonType1)}` : ""} ${!nextCard ? "deck-empty" : ""}`}
@@ -1263,18 +1263,16 @@ export function ModernGamePage() {
               )}
             </div>
           </div>
-          <p className="next-card-info">
-            {isDeckLoading ? "Building randomized Pokemon deck..." : !nextCard ? "Deck exhausted" : nextCard.kind === "pokemon" ? `Next: ${nextCard.name}` : `Next: ${nextCard.suitName}`}
-          </p>
-          <p className="deck-count-info">{isDeckLoading ? "Please wait..." : !nextCard ? (mode === GAME_MODE.POKEDEX ? "0 cards in cycle" : "0 cards left") : deckCountLabel}</p>
+          <p className="next-card-info">{""}</p>
+          <p className="deck-count-info">{""}</p>
           <div className="deck-actions">
             <div className="player-name-field">
-              <label htmlFor="playerNameInput">Player Name</label>
+              <label htmlFor="playerNameInput">{""}</label>
               <input
                 id="playerNameInput"
                 type="text"
                 maxLength={20}
-                placeholder="Kiddo"
+                placeholder="player name"
                 value={playerName}
                 onChange={(event) => setPlayerName(normalizePlayerName(event.target.value))}
               />
