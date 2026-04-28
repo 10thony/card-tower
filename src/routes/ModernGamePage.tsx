@@ -295,7 +295,7 @@ export function ModernGamePage() {
   const columns = useCallback(() => {
     const zone = towerZoneRef.current;
     if (!zone) return 1;
-    return Math.max(1, Math.floor((zone.clientWidth - 16) / (CARD_WIDTH + CELL_GAP_X)));
+    return Math.max(1, Math.floor((zone.clientWidth - 16 + CELL_GAP_X) / (CARD_WIDTH + CELL_GAP_X)));
   }, []);
 
   const rowsCapacity = useCallback(() => {
@@ -304,12 +304,28 @@ export function ModernGamePage() {
     return Math.max(1, Math.floor((zone.clientHeight - 16 + CELL_GAP_Y) / (CARD_HEIGHT + CELL_GAP_Y)));
   }, []);
 
-  const gridTopOffset = useCallback(() => {
+  const gridGapX = useCallback(() => {
     const zone = towerZoneRef.current;
-    if (!zone) return 8;
+    if (!zone) return CELL_GAP_X;
+    const maxCols = Math.max(1, Math.floor((zone.clientWidth - 16 + CELL_GAP_X) / (CARD_WIDTH + CELL_GAP_X)));
+    if (maxCols <= 1) return 0;
+    return Math.max(0, (zone.clientWidth - 16 - maxCols * CARD_WIDTH) / (maxCols - 1));
+  }, []);
+
+  const gridGapY = useCallback(() => {
+    const zone = towerZoneRef.current;
+    if (!zone) return CELL_GAP_Y;
     const maxRows = Math.max(1, Math.floor((zone.clientHeight - 16 + CELL_GAP_Y) / (CARD_HEIGHT + CELL_GAP_Y)));
-    const bottomAlignedTop = zone.clientHeight - 8 - CARD_HEIGHT - (maxRows - 1) * (CARD_HEIGHT + CELL_GAP_Y);
-    return Math.max(8, bottomAlignedTop);
+    if (maxRows <= 1) return 0;
+    return Math.max(0, (zone.clientHeight - 16 - maxRows * CARD_HEIGHT) / (maxRows - 1));
+  }, []);
+
+  const gridLeftOffset = useCallback(() => {
+    return 8;
+  }, []);
+
+  const gridTopOffset = useCallback(() => {
+    return 8;
   }, []);
 
   const cards = useMemo(() => Array.from(board.values()), [board]);
@@ -411,16 +427,19 @@ export function ModernGamePage() {
     (clientX: number, clientY: number) => {
       const rect = towerZoneRef.current?.getBoundingClientRect();
       if (!rect) return { col: 0, row: 0 };
+      const leftOffset = gridLeftOffset();
       const topOffset = gridTopOffset();
-      const localX = clientX - rect.left - 8;
+      const gapX = gridGapX();
+      const gapY = gridGapY();
+      const localX = clientX - rect.left - leftOffset;
       const localY = clientY - rect.top - topOffset;
       const maxCol = columns() - 1;
       const maxRow = rowsCapacity() - 1;
-      const col = Math.max(0, Math.min(maxCol, Math.floor(localX / (CARD_WIDTH + CELL_GAP_X))));
-      const row = Math.max(0, Math.min(maxRow, Math.floor(localY / (CARD_HEIGHT + CELL_GAP_Y))));
+      const col = Math.max(0, Math.min(maxCol, Math.floor(localX / (CARD_WIDTH + gapX))));
+      const row = Math.max(0, Math.min(maxRow, Math.floor(localY / (CARD_HEIGHT + gapY))));
       return { col, row };
     },
-    [columns, rowsCapacity, gridTopOffset]
+    [columns, rowsCapacity, gridLeftOffset, gridTopOffset, gridGapX, gridGapY]
   );
 
   const placeDrawnCard = useCallback(
@@ -1297,8 +1316,8 @@ export function ModernGamePage() {
               {cards
                 .sort((a, b) => a.row - b.row || a.col - b.col)
                 .map((card) => {
-                  const x = 8 + card.col * (CARD_WIDTH + CELL_GAP_X);
-                  const y = gridTopOffset() + card.row * (CARD_HEIGHT + CELL_GAP_Y);
+                  const x = gridLeftOffset() + card.col * (CARD_WIDTH + gridGapX());
+                  const y = gridTopOffset() + card.row * (CARD_HEIGHT + gridGapY());
                   const specialBadge =
                     card.type === "normal" ? null : (
                       <span className="pokemon-special-badge">
