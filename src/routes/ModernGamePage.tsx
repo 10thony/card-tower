@@ -18,6 +18,7 @@ const PLAYER_NAME_CACHE_KEY = "cardTower.playerName.v1";
 const HIGHSCORES_CACHE_KEY = "cardTower.highscores.v1";
 const HUD_PANEL_OFFSET_KEY = "cardTower.hudPanelOffset.v1";
 const DECK_PANEL_OFFSET_KEY = "cardTower.deckPanelOffset.v1";
+const DECK_PANEL_SIZE_KEY = "cardTower.deckPanelSize.v1";
 const TAP_MOVE_THRESHOLD_PX = 12;
 const convexUrl = import.meta.env.VITE_CONVEX_URL as string | undefined;
 
@@ -167,6 +168,7 @@ function createShuffledDeck() {
 }
 
 type PanelOffset = { x: number; y: number };
+type PanelSize = { width: number; height: number };
 
 function readPanelOffset(storageKey: string): PanelOffset {
   try {
@@ -196,8 +198,39 @@ function clampPanelOffset({ x, y }: PanelOffset): PanelOffset {
   };
 }
 
+function readDeckPanelSize(storageKey: string): PanelSize {
+  try {
+    const raw = sessionStorage.getItem(storageKey);
+    if (!raw) return { width: 220, height: 0 };
+    const p = JSON.parse(raw) as { width?: number; height?: number };
+    const width = Number(p.width);
+    const height = Number(p.height);
+    return {
+      width: Number.isFinite(width) ? width : 220,
+      height: Number.isFinite(height) ? height : 0
+    };
+  } catch {
+    return { width: 220, height: 0 };
+  }
+}
+
+function clampDeckPanelSize({ width, height }: PanelSize): PanelSize {
+  if (typeof window === "undefined") return { width, height };
+  const minWidth = 180;
+  const maxWidth = Math.max(minWidth, window.innerWidth - 12);
+  const minHeight = 160;
+  const maxHeight = Math.max(minHeight, window.innerHeight - 16);
+  const safeWidth = Number.isFinite(width) ? width : 220;
+  const safeHeight = Number.isFinite(height) ? height : 0;
+  return {
+    width: Math.max(minWidth, Math.min(maxWidth, safeWidth)),
+    height: safeHeight <= 0 ? 0 : Math.max(minHeight, Math.min(maxHeight, safeHeight))
+  };
+}
+
 export function ModernGamePage() {
   const towerZoneRef = useRef<HTMLDivElement | null>(null);
+  const deckPanelRef = useRef<HTMLDivElement | null>(null);
   const resetGameRef = useRef<(targetMode: GameMode) => Promise<void>>(async () => {});
   const [board, setBoard] = useState<Map<string, BoardCard>>(new Map());
   const [drawPile, setDrawPile] = useState<ClassicCard[]>([]);
@@ -223,6 +256,7 @@ export function ModernGamePage() {
   });
   const [hudPanelOffset, setHudPanelOffset] = useState<PanelOffset>({ x: 0, y: 0 });
   const [deckPanelOffset, setDeckPanelOffset] = useState<PanelOffset>({ x: 0, y: 0 });
+  const [deckPanelSize, setDeckPanelSize] = useState<PanelSize>({ width: 220, height: 0 });
   const [panelDrag, setPanelDrag] = useState<{
     kind: "hud" | "deck";
     pointerId: number;
@@ -231,6 +265,14 @@ export function ModernGamePage() {
     originX: number;
     originY: number;
   } | null>(null);
+  const [panelResize, setPanelResize] = useState<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originWidth: number;
+    originHeight: number;
+  } | null>(null);
+  const deckPanelOffsetRef = useRef<PanelOffset>({ x: 0, y: 0 });
 
   const evolutionByDex = useMemo(() => {
     const map = new Map<number, { chainId: string; stage: number; finalDex: number; finalName: string }>();
@@ -259,11 +301,58 @@ export function ModernGamePage() {
   const rowsCapacity = useCallback(() => {
     const zone = towerZoneRef.current;
     if (!zone) return 1;
-    return Math.max(1, Math.floor((zone.clientHeight - 16) / (CARD_HEIGHT + CELL_GAP_Y)));
+    return Math.max(1, Math.floor((zone.clientHeight - 16 + CELL_GAP_Y) / (CARD_HEIGHT + CELL_GAP_Y)));
   }, []);
 
   const cards = useMemo(() => Array.from(board.values()), [board]);
   const rowsUsed = useMemo(() => new Set(cards.map((card) => card.row)).size, [cards]);
+
+  const clampDeckPanelOffsetToViewport = useCallback((nextOffset: PanelOffset) => {
+    const panelEl = deckPanelRef.current;
+    if (typeof window === "undefined" || !panelEl) {
+      return clampPanelOffset(nextOffset);
+    }
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const margin = 6;
+    const currentOffset = deckPanelOffsetRef.current;
+    const rect = panelEl.getBoundingClientRect();
+    let deltaX = nextOffset.x - currentOffset.x;
+    let deltaY = nextOffset.y - currentOffset.y;
+    let projectedLeft = rect.left + deltaX;
+    let projectedRight = rect.right + deltaX;
+    let projectedTop = rect.top + deltaY;
+    let projectedBottom = rect.bottom + deltaY;
+
+    if (rect.width + margin * 2 <= viewportWidth) {
+      if (projectedLeft < margin) {
+        deltaX += margin - projectedLeft;
+        projectedRight += margin - projectedLeft;
+      }
+      if (projectedRight > viewportWidth - margin) {
+        deltaX -= projectedRight - (viewportWidth - margin);
+      }
+    } else {
+      deltaX += margin - projectedLeft;
+    }
+
+    if (rect.height + margin * 2 <= viewportHeight) {
+      if (projectedTop < margin) {
+        deltaY += margin - projectedTop;
+        projectedBottom += margin - projectedTop;
+      }
+      if (projectedBottom > viewportHeight - margin) {
+        deltaY -= projectedBottom - (viewportHeight - margin);
+      }
+    } else {
+      deltaY += margin - projectedTop;
+    }
+
+    return {
+      x: currentOffset.x + deltaX,
+      y: currentOffset.y + deltaY
+    };
+  }, []);
 
   const setCardAt = useCallback((next: Map<string, BoardCard>, col: number, row: number, card: Card) => {
     next.set(keyFor(col, row), { ...card, col, row });
@@ -746,9 +835,30 @@ export function ModernGamePage() {
   }, [loadHighscores]);
 
   useEffect(() => {
-    setHudPanelOffset(readPanelOffset(HUD_PANEL_OFFSET_KEY));
-    setDeckPanelOffset(readPanelOffset(DECK_PANEL_OFFSET_KEY));
-  }, []);
+    setHudPanelOffset(clampPanelOffset(readPanelOffset(HUD_PANEL_OFFSET_KEY)));
+    setDeckPanelOffset(clampDeckPanelOffsetToViewport(readPanelOffset(DECK_PANEL_OFFSET_KEY)));
+    setDeckPanelSize(clampDeckPanelSize(readDeckPanelSize(DECK_PANEL_SIZE_KEY)));
+  }, [clampDeckPanelOffsetToViewport]);
+
+  useEffect(() => {
+    deckPanelOffsetRef.current = deckPanelOffset;
+  }, [deckPanelOffset]);
+
+  useEffect(() => {
+    const onViewportResize = () => {
+      setHudPanelOffset((prev) => clampPanelOffset(prev));
+      setDeckPanelOffset((prev) => clampDeckPanelOffsetToViewport(prev));
+      setDeckPanelSize((prev) => clampDeckPanelSize(prev));
+    };
+    window.addEventListener("resize", onViewportResize);
+    return () => {
+      window.removeEventListener("resize", onViewportResize);
+    };
+  }, [clampDeckPanelOffsetToViewport]);
+
+  useEffect(() => {
+    setDeckPanelOffset((prev) => clampDeckPanelOffsetToViewport(prev));
+  }, [deckPanelSize.width, deckPanelSize.height, clampDeckPanelOffsetToViewport]);
 
   useEffect(() => {
     if (!panelDrag) return;
@@ -756,14 +866,14 @@ export function ModernGamePage() {
     const onMove = (event: PointerEvent) => {
       if (event.pointerId !== pointerId) return;
       event.preventDefault();
-      const next = clampPanelOffset({
+      const next = {
         x: originX + (event.clientX - startX),
         y: originY + (event.clientY - startY)
-      });
+      };
       if (kind === "hud") {
-        setHudPanelOffset(next);
+        setHudPanelOffset(clampPanelOffset(next));
       } else {
-        setDeckPanelOffset(next);
+        setDeckPanelOffset(clampDeckPanelOffsetToViewport(next));
       }
     };
     const onEnd = (event: PointerEvent) => {
@@ -780,7 +890,7 @@ export function ModernGamePage() {
         });
       } else {
         setDeckPanelOffset((pos) => {
-          const c = clampPanelOffset(pos);
+          const c = clampDeckPanelOffsetToViewport(pos);
           try {
             sessionStorage.setItem(DECK_PANEL_OFFSET_KEY, JSON.stringify(c));
           } catch {
@@ -799,7 +909,42 @@ export function ModernGamePage() {
       window.removeEventListener("pointerup", onEnd);
       window.removeEventListener("pointercancel", onEnd);
     };
-  }, [panelDrag]);
+  }, [panelDrag, clampDeckPanelOffsetToViewport]);
+
+  useEffect(() => {
+    if (!panelResize) return;
+    const { pointerId, startX, startY, originWidth, originHeight } = panelResize;
+    const onMove = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return;
+      event.preventDefault();
+      const next = clampDeckPanelSize({
+        width: originWidth + (event.clientX - startX),
+        height: Math.max(0, originHeight + (event.clientY - startY))
+      });
+      setDeckPanelSize(next);
+    };
+    const onEnd = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return;
+      setDeckPanelSize((size) => {
+        const clamped = clampDeckPanelSize(size);
+        try {
+          sessionStorage.setItem(DECK_PANEL_SIZE_KEY, JSON.stringify(clamped));
+        } catch {
+          // ignore storage issues
+        }
+        return clamped;
+      });
+      setPanelResize(null);
+    };
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onEnd);
+    window.addEventListener("pointercancel", onEnd);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
+    };
+  }, [panelResize]);
 
   useEffect(() => {
     resetGameRef.current = resetGame;
@@ -887,7 +1032,7 @@ export function ModernGamePage() {
   };
 
   const onHudDragHandlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (panelDrag || isDragging) return;
+    if (panelDrag || panelResize || isDragging) return;
     event.preventDefault();
     event.stopPropagation();
     setPanelDrag({
@@ -914,6 +1059,19 @@ export function ModernGamePage() {
       startY: event.clientY,
       originX: deckPanelOffset.x,
       originY: deckPanelOffset.y
+    });
+  };
+
+  const onDeckResizeHandlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (panelDrag || panelResize || isDragging) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setPanelResize({
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originWidth: deckPanelSize.width,
+      originHeight: deckPanelSize.height
     });
   };
 
@@ -985,12 +1143,15 @@ export function ModernGamePage() {
         </div>
 
         <div
+          ref={deckPanelRef}
           className={`deck-panel deck-panel-compact draggable-overlay ${panelHidden.deck ? "is-hidden" : ""} ${panelDrag?.kind === "deck" ? "is-panel-dragging" : ""}`}
           data-panel="deck"
           style={
             {
               ["--panel-ox" as string]: `${deckPanelOffset.x}px`,
-              ["--panel-oy" as string]: `${deckPanelOffset.y}px`
+              ["--panel-oy" as string]: `${deckPanelOffset.y}px`,
+              ["--panel-w" as string]: `${deckPanelSize.width}px`,
+              ["--panel-h" as string]: deckPanelSize.height > 0 ? `${deckPanelSize.height}px` : "auto"
             } as CSSProperties
           }
           onPointerDown={onDeckPanelPointerDown}
@@ -1058,6 +1219,13 @@ export function ModernGamePage() {
             <button onClick={() => void resetGame(mode)} disabled={isDeckLoading}>New Tower</button>
             <button onClick={() => void onSaveScore()} disabled={isDeckLoading}>Save Score</button>
           </div>
+          <div
+            className={`deck-panel-resize-handle ${panelResize ? "is-resizing" : ""}`}
+            title="Resize panel"
+            role="button"
+            aria-label="Resize deck panel"
+            onPointerDown={onDeckResizeHandlePointerDown}
+          />
         </div>
 
         <div className={`core-box draggable-overlay ${panelHidden.score ? "is-hidden" : ""}`} data-panel="score">

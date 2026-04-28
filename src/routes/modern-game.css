@@ -197,13 +197,40 @@ body:has(.modern-game-page) {
 }
 
 .modern-game-page .deck-panel-compact {
-  width: 220px;
+  width: var(--panel-w, 220px);
+  height: var(--panel-h, auto);
   padding: 8px 6px;
   position: absolute;
   left: 270px;
   top: 50px;
   z-index: 40;
   transform: translate(var(--panel-ox, 0px), var(--panel-oy, 0px));
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.modern-game-page .deck-panel-compact .deck-actions {
+  margin-bottom: 14px;
+}
+
+.modern-game-page .deck-panel-resize-handle {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1px solid rgba(244, 214, 144, 0.6);
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 236, 189, 0.65) 0 2px, transparent 2px 4px),
+    rgba(7, 32, 29, 0.85);
+  cursor: nwse-resize;
+  touch-action: none;
+  z-index: 3;
+}
+
+.modern-game-page .deck-panel-resize-handle.is-resizing {
+  opacity: 0.85;
 }
 
 .modern-game-page .deck-panel-compact.is-panel-dragging {
@@ -606,15 +633,21 @@ body:has(.modern-game-page) {
     left: 50%;
     right: auto;
     top: var(--panel-below-hud);
-    width: min(300px, calc(100vw - 16px));
+    width: var(--panel-w, min(300px, calc(100vw - 16px)));
     max-width: calc(100vw - var(--mg-safe-left) - var(--mg-safe-right) - 12px);
-    max-height: min(72dvh, 480px);
+    height: var(--panel-h, auto);
+    max-height: min(84dvh, 560px);
     margin: 0;
     transform: translateX(calc(-50% + var(--panel-ox, 0px))) translateY(var(--panel-oy, 0px));
     overflow: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     z-index: 42;
+  }
+
+  .modern-game-page .deck-panel-resize-handle {
+    width: 22px;
+    height: 22px;
   }
 
   .modern-game-page .title-wrap {
