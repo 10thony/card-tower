@@ -1059,6 +1059,41 @@ export function ModernGamePage() {
     }
   };
 
+  const onNextCard = useCallback(() => {
+    if (isDeckLoading || !nextCard) return;
+
+    if (mode === GAME_MODE.POKEDEX && nextCard.kind === "pokemon") {
+      const currentEntry: PokedexEntry = {
+        dexNumber: Number(nextCard.dexNumber),
+        name: nextCard.name,
+        type1: nextCard.pokemonType1,
+        type2: nextCard.pokemonType2
+      };
+
+      setPokedexDrawPile((prev) => {
+        const sourcePile = prev.length ? prev : shuffleList(pokedexPool);
+        if (!sourcePile.length) return prev;
+        const upcoming = sourcePile[sourcePile.length - 1];
+        const remaining = sourcePile.slice(0, -1);
+        const nextPile = [currentEntry, ...remaining];
+        setNextCard(createPokemonCard(upcoming));
+        return nextPile;
+      });
+      return;
+    }
+
+    if (mode === GAME_MODE.CLASSIC && nextCard.kind === "classic") {
+      setDrawPile((prev) => {
+        if (!prev.length) return prev;
+        const upcoming = prev[prev.length - 1];
+        const remaining = prev.slice(0, -1);
+        const nextPile = [nextCard, ...remaining];
+        setNextCard(upcoming);
+        return nextPile;
+      });
+    }
+  }, [isDeckLoading, nextCard, mode, pokedexPool, createPokemonCard]);
+
   const onHudDragHandlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (panelDrag || panelResize || isDragging) return;
     event.preventDefault();
@@ -1244,6 +1279,7 @@ export function ModernGamePage() {
                 onChange={(event) => setPlayerName(normalizePlayerName(event.target.value))}
               />
             </div>
+            <button onClick={onNextCard} disabled={isDeckLoading || !nextCard}>Next Card</button>
             <button onClick={() => void resetGame(mode)} disabled={isDeckLoading}>New Tower</button>
             <button onClick={() => void onSaveScore()} disabled={isDeckLoading}>Save Score</button>
           </div>

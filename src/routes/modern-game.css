@@ -650,6 +650,16 @@ body:has(.modern-game-page) {
     height: 22px;
   }
 
+  .modern-game-page .deck-panel-compact button {
+    padding: 7px 8px;
+    font-size: 0.8rem;
+    border-radius: 7px;
+  }
+
+  .modern-game-page .deck-panel-compact .player-name-field input {
+    padding: 7px 9px;
+  }
+
   .modern-game-page .title-wrap {
     position: absolute;
     left: max(8px, var(--mg-safe-left));
